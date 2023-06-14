@@ -7,5 +7,5 @@
 
 namespace filtering {
 // will return how many strings are valid
-size_t filter(std::string& lines);
+size_t bench_all(std::string& lines);
 }

@@ -1,4 +1,4 @@
-#include <algorithm.cuh>
+#include <benchmark.cuh>
 
 #include <thrust/reduce.h>
 
@@ -22,52 +22,48 @@ inline void gpuAssert(cudaError_t code, const char *file, int line,
   }
 }
 
-__global__ void find_newlines(const char *text, const size_t size,
-                              bool *is_newline) {
-  auto grid = cg::this_grid();
-  const size_t grid_size = grid.size();
-  for (auto tid = grid.thread_rank(); tid < size; tid += grid_size) {
-    is_newline[tid] = (text[tid] == '\n');
+struct is_newline
+{
+  __host__ __device__
+  bool operator()(const char* a)
+  {
+    return *a == '\n';
   }
-}
+};
 
 // currently ASCII assumption
-size_t filter(std::string &lines) {
+size_t bench_all(std::string &lines) {
   const auto byte_count = lines.size();
   const auto len = lines.size() + 1;
   const char *h_text = lines.c_str();
   char *d_text;
-  bool *d_is_newline, *d_is_valid;
-  size_t *d_indices;
+  bool *d_is_valid;
+  char** d_addresses;
 
   cudaMalloc(&d_text, len);
   cudaMemcpy(d_text, h_text, len, cudaMemcpyHostToDevice);
-  cudaMalloc(&d_is_newline, len * sizeof(char));
-
-  find_newlines<<<4096, 1024>>>(d_text, len, d_is_newline);
 
   const auto json_count =
-      thrust::reduce(thrust::device, d_is_newline, d_is_newline + len, 0);
+      thrust::count(thrust::device, d_text, d_text + len, '\n');
 
-  cudaMalloc(&d_indices, json_count * sizeof(size_t));
+  cudaMalloc(&d_addresses, json_count * sizeof(char*));
   cudaMalloc(&d_is_valid, json_count * sizeof(bool));
 
   thrust::copy_if(thrust::device,
-                  thrust::make_counting_iterator(static_cast<decltype(len)>(0)),
-                  thrust::make_counting_iterator(len), d_is_newline, d_indices,
-                  thrust::identity<bool>());
+                  thrust::make_counting_iterator(d_text),
+                  thrust::make_counting_iterator(d_text + len), d_addresses,
+                  is_newline());
 
   std::cout << "JSON COUNT: " << json_count << std::endl;
 
-  utils::bench<filter::warp_filter>(byte_count, d_text, json_count, d_indices,
-                                    d_is_valid);
+  utils::bench<filter::warp_filter>(byte_count, d_text, json_count, d_addresses,
+                                   d_is_valid);
 
   const auto correct_count =
       thrust::reduce(thrust::device, d_is_valid, d_is_valid + json_count, 0);
   std::cout << " VALID: " << correct_count << std::endl;
-  cudaFree(d_indices);
+  cudaFree(d_addresses);
   cudaFree(d_text);
-  cudaFree(d_is_newline);
   return 0;
 }
 

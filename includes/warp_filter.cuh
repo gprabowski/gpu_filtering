@@ -37,12 +37,12 @@ __device__ __host__ __forceinline__ constexpr int find_group_size() {
 template<int WordSize>
 __device__ __host__ constexpr auto comp_type() {
     if constexpr(WordSize % 8 == 0) {
-        // double doesn't make sense
+        // 64b doesn't make sense
         // as the memory bus is saturated enough 
-        // when loading floats
-        return float{};
+        // when loading 32b
+        return uint32_t{};
     } else if constexpr(WordSize % 4 == 0) {
-        return float{};
+        return uint32_t{};
     } else {
         return char{};
     }
@@ -50,8 +50,7 @@ __device__ __host__ constexpr auto comp_type() {
 
 template <int WordLen>
 __global__ void filter_warp_per_json(const char *text, size_t num_jsons,
-                                     size_t *delimiters, bool *out) {
-  constexpr auto FilterWord = config::full_filter;
+                                     char** addresses, bool *out) {
   constexpr auto group_size = find_group_size<WordLen>();
 
   const auto grid = cg::this_grid();
@@ -65,8 +64,8 @@ __global__ void filter_warp_per_json(const char *text, size_t num_jsons,
     return;
   }
 
-  const auto json_start = (wid == 0) ? 0 : delimiters[wid - 1];
-  const auto json_end = delimiters[wid];
+  const auto json_start = (wid == 0) ? text : addresses[wid - 1];
+  const auto json_end = addresses[wid];
 
   bool result = true;
   int done;
@@ -74,11 +73,11 @@ __global__ void filter_warp_per_json(const char *text, size_t num_jsons,
   using CT = decltype(comp_type<WordLen>());
   constexpr int comp_len = sizeof(CT);
   CT f{0}, t{0};
-  memcpy((void*)&f, (void*)&config::full_filter[lid], comp_len);
+  memcpy((void*)&f, (void*)&config::full_filter[comp_len * lid], comp_len);
 
-  for (size_t i = json_start; i < json_end - WordLen + 1; ++i) {
-    memcpy((void*)&t, (void*)&text[i + lid], comp_len);
-    result = ((lid >= WordLen) || (t == f));
+  for (auto addr = json_start; addr < json_end - WordLen + 1; ++addr) {
+    memcpy((void*)&t, (void*)&addr[comp_len*lid], comp_len);
+    result = ((lid >= WordLen / comp_len) || (t == f));
     warp.sync();
     warp.match_all(result, done);
     if (done && result) {
@@ -93,8 +92,8 @@ template<int WordLen>
 struct warp_filter {
     constexpr static char name[] = "Cooperative Group Filter";
     int WarpsPerBlock = 8;
-    auto operator()(const char* text, size_t num_jsons, size_t *delimiters, bool* out) {
-        filter_warp_per_json<WordLen><<<(num_jsons + WarpsPerBlock - 1) / WarpsPerBlock, WarpsPerBlock * 32>>>(text, num_jsons, delimiters, out);
+    auto operator()(const char* text, size_t num_jsons, char** addresses, bool* out) {
+        filter_warp_per_json<WordLen><<<(num_jsons + WarpsPerBlock - 1) / WarpsPerBlock, WarpsPerBlock * 32>>>(text, num_jsons, addresses, out);
     }
 };
 

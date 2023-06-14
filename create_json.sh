@@ -15,8 +15,6 @@ cat test2 >> test1
 cat test1 >> test2
 cat test2 >> test1
 cat test1 >> test2
-cat test2 >> test1
-cat test1 >> test2
 
 rm large-file.json test1
 mv test2 test.json
