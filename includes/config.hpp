@@ -11,3 +11,15 @@ static __device__ constexpr char full_filter[] =
     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
 
 } // namespace config
+
+namespace configuration {
+    const int Index = 1;
+
+    __device__ const char d_string1[] = "PushEventxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+
+    template <int Index> __device__ constexpr const char *get_word() {
+        return d_string1;
+    }
+
+    template <int Index> __device__ constexpr size_t get_len() { return 15; }
+}

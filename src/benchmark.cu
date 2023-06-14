@@ -5,6 +5,8 @@
 #include <config.hpp>
 #include <filter_runner.cuh>
 #include <warp_filter.cuh>
+#include <thread_filter.cuh>
+#include <block_filter.cuh>
 
 namespace filtering {
 
