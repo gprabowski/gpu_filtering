@@ -6,7 +6,7 @@
 #include <sstream>
 #include <vector>
 
-#include <algorithm.cuh>
+#include <benchmark.cuh>
 
 int main() {
   // 1. Read the file
@@ -15,5 +15,5 @@ int main() {
   ss << input.rdbuf();
   // 2. Filter
   auto res = ss.str();
-  filtering::filter(res);
+  filtering::bench_all(res);
 }

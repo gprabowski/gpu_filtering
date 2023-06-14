@@ -13,7 +13,7 @@ set(CMAKE_BUILD_TYPE Debug)
 find_package(CUDAToolkit REQUIRED)
 
 add_executable(filtering 
-    src/algorithm.cu
+    src/benchmark.cu
     src/main.cpp)
 
 set_target_properties(filtering PROPERTIES CUDA_ARCHITECTURES "75")
