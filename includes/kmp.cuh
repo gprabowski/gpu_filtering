@@ -9,12 +9,12 @@
 #include "utils.cuh"
 #include <config.hpp>
 
-extern __device__ void compute_lps_array(const char *pattern, size_t pattern_size, int *lps);
+__device__ void compute_lps_array(const char *pattern, size_t pattern_size, int *lps);
 
-template<int Index, int WordLen>
+template<int WordLen>
 __device__ bool is_pattern_present_in_text(const char *text, size_t text_size) {
     constexpr auto pattern_size = WordLen;
-    constexpr auto pattern = configuration::get_word<Index>();
+    constexpr auto pattern = config::full_filter;
     int lps[pattern_size];
 
     compute_lps_array(pattern, pattern_size, lps);

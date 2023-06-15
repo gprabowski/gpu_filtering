@@ -10,12 +10,10 @@
 #include <kmp.cuh>
 
 namespace filtering {
-//    template<int Index>
-//    size_t block_filter(std::string &lines);
 
     constexpr int THREAD_SIZE = 1024;
 
-    template<int Index, int WordLen>
+    template<int WordLen>
     __global__ void filter_block_per_json_kernel(const char *text, size_t num_of_jsons, char **addresses,
                                                  bool *filter_result) {
         extern __shared__ char shared_json[];
@@ -42,7 +40,7 @@ namespace filtering {
             filter_result[blockIdx.x] = false;
         }
 
-        if (is_pattern_present_in_text<Index, WordLen>(shared_chunk_start, json_chunk_length + WordLen - 1)) {
+        if (is_pattern_present_in_text<WordLen>(shared_chunk_start, json_chunk_length + WordLen - 1)) {
             filter_result[blockIdx.x] = true;
             return;
         }
@@ -54,11 +52,11 @@ namespace filtering {
 
         auto operator()(const char *text, size_t num_jsons, char **addresses, bool *out) {
 
-            CUDA_CHECK(cudaFuncSetAttribute(filter_block_per_json_kernel<0, WordLength>,
+            CUDA_CHECK(cudaFuncSetAttribute(filter_block_per_json_kernel<WordLength>,
                                             cudaFuncAttributeMaxDynamicSharedMemorySize,
                                             60 * 1024));
 
-            filter_block_per_json_kernel<0, WordLength><<<num_jsons, THREAD_SIZE, 60 * 1024>>>(
+            filter_block_per_json_kernel<WordLength><<<num_jsons, THREAD_SIZE, 60 * 1024>>>(
                     text,
                     num_jsons,
                     addresses,

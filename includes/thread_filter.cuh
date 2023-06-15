@@ -9,10 +9,8 @@
 #include "kmp.cuh"
 
 namespace filtering {
-//    template<int Index>
-//    size_t thread_filter(std::string &lines);
 
-    template<int Index, int WordLen>
+    template<int WordLen>
     __global__ void filter_thread_per_json_kernel(const char *text, size_t num_of_jsons, char** addresses,
                                                   bool *filter_result) {
         const auto tid = TID;
@@ -25,7 +23,7 @@ namespace filtering {
 
         const auto json_length = json_end - json_start;
 
-        filter_result[tid] = is_pattern_present_in_text<Index, WordLen>(json_start, json_length);
+        filter_result[tid] = is_pattern_present_in_text<WordLen>(json_start, json_length);
     }
 
     template<int WordLength>
@@ -35,7 +33,7 @@ namespace filtering {
         constexpr static int ThreadSize = 1024;
 
         auto operator()(const char *text, size_t num_jsons, char **addresses, bool *out) {
-            filter_thread_per_json_kernel<1, WordLength><<<(num_jsons - 1) / ThreadSize + 1, ThreadSize>>>(text, num_jsons, addresses, out);
+            filter_thread_per_json_kernel<WordLength><<<(num_jsons - 1) / ThreadSize + 1, ThreadSize>>>(text, num_jsons, addresses, out);
         }
 
     };
