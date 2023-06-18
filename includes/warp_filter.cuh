@@ -68,7 +68,7 @@ __global__ void filter_warp_per_json(const char *text, size_t num_jsons,
   const auto json_end = addresses[wid];
 
   bool result = true;
-  int done;
+  int done = true;
 
   using CT = decltype(comp_type<WordLen>());
   constexpr int comp_len = sizeof(CT);
@@ -78,8 +78,12 @@ __global__ void filter_warp_per_json(const char *text, size_t num_jsons,
   for (auto addr = json_start; addr < json_end - WordLen + 1; ++addr) {
     memcpy((void*)&t, (void*)&addr[comp_len*lid], comp_len);
     result = ((lid >= WordLen / comp_len) || (t == f));
-    warp.sync();
-    warp.match_all(result, done);
+    if constexpr(group_size > 1) {
+        warp.sync();
+        warp.match_all(result, done);
+    } else {
+        done = true;
+    }
     if (done && result) {
       out[wid] = true;
       return;

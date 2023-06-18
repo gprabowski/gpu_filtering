@@ -2,8 +2,10 @@
 
 #include <thrust/reduce.h>
 
+#include <block_filter.cuh>
 #include <config.hpp>
 #include <filter_runner.cuh>
+#include <thread_filter.cuh>
 #include <warp_filter.cuh>
 
 namespace filtering {
@@ -22,13 +24,8 @@ inline void gpuAssert(cudaError_t code, const char *file, int line,
   }
 }
 
-struct is_newline
-{
-  __host__ __device__
-  bool operator()(const char* a)
-  {
-    return *a == '\n';
-  }
+struct is_newline {
+  __host__ __device__ bool operator()(const char *a) { return *a == '\n'; }
 };
 
 // currently ASCII assumption
@@ -38,7 +35,7 @@ size_t bench_all(std::string &lines) {
   const char *h_text = lines.c_str();
   char *d_text;
   bool *d_is_valid;
-  char** d_addresses;
+  char **d_addresses;
 
   cudaMalloc(&d_text, len);
   cudaMemcpy(d_text, h_text, len, cudaMemcpyHostToDevice);
@@ -46,18 +43,21 @@ size_t bench_all(std::string &lines) {
   const auto json_count =
       thrust::count(thrust::device, d_text, d_text + len, '\n');
 
-  cudaMalloc(&d_addresses, json_count * sizeof(char*));
+  cudaMalloc(&d_addresses, json_count * sizeof(char *));
   cudaMalloc(&d_is_valid, json_count * sizeof(bool));
 
-  thrust::copy_if(thrust::device,
-                  thrust::make_counting_iterator(d_text),
+  thrust::copy_if(thrust::device, thrust::make_counting_iterator(d_text),
                   thrust::make_counting_iterator(d_text + len), d_addresses,
                   is_newline());
 
   std::cout << "JSON COUNT: " << json_count << std::endl;
 
+  utils::bench<block_filter>(byte_count, d_text, json_count, d_addresses,
+                             d_is_valid);
+  utils::bench<thread_filter>(byte_count, d_text, json_count, d_addresses,
+                              d_is_valid);
   utils::bench<filter::warp_filter>(byte_count, d_text, json_count, d_addresses,
-                                   d_is_valid);
+                                    d_is_valid);
 
   const auto correct_count =
       thrust::reduce(thrust::device, d_is_valid, d_is_valid + json_count, 0);
